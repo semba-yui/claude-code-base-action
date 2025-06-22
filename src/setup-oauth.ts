@@ -1,6 +1,6 @@
 import { mkdir, writeFile } from "fs/promises";
 import { join } from "path";
-import { homedir } from "os";
+import { getClaudeConfigHomeDir } from "./setup-claude-code-settings";
 
 interface OAuthCredentials {
   accessToken: string;
@@ -9,7 +9,7 @@ interface OAuthCredentials {
 }
 
 export async function setupOAuthCredentials(credentials: OAuthCredentials) {
-  const claudeDir = join(homedir(), ".claude");
+  const claudeDir = getClaudeConfigHomeDir();
   const credentialsPath = join(claudeDir, ".credentials.json");
 
   // Create the .claude directory if it doesn't exist

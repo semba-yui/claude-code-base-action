@@ -1,20 +1,40 @@
 #!/usr/bin/env bun
 
-import { describe, test, expect, afterEach } from "bun:test";
+import { describe, test, expect, afterEach, beforeEach } from "bun:test";
 import { setupOAuthCredentials } from "../src/setup-oauth";
 import { readFile, unlink, access } from "fs/promises";
 import { join } from "path";
 import { homedir } from "os";
 
 describe("setupOAuthCredentials", () => {
-  const credentialsPath = join(homedir(), ".claude", ".credentials.json");
+  let originalXdgConfigHome: string | undefined;
+
+  beforeEach(() => {
+    // Save original XDG_CONFIG_HOME
+    originalXdgConfigHome = process.env.XDG_CONFIG_HOME;
+  });
 
   afterEach(async () => {
+    // Restore original XDG_CONFIG_HOME
+    if (originalXdgConfigHome === undefined) {
+      delete process.env.XDG_CONFIG_HOME;
+    } else {
+      process.env.XDG_CONFIG_HOME = originalXdgConfigHome;
+    }
+
     // Clean up the credentials file after each test
-    try {
-      await unlink(credentialsPath);
-    } catch (e) {
-      // Ignore if file doesn't exist
+    const paths = [join(homedir(), ".claude", ".credentials.json")];
+
+    if (originalXdgConfigHome) {
+      paths.push(join(originalXdgConfigHome, "claude", ".credentials.json"));
+    }
+
+    for (const path of paths) {
+      try {
+        await unlink(path);
+      } catch (e) {
+        // Ignore if file doesn't exist
+      }
     }
   });
 
@@ -26,6 +46,8 @@ describe("setupOAuthCredentials", () => {
     };
 
     await setupOAuthCredentials(credentials);
+
+    const credentialsPath = join(homedir(), ".claude", ".credentials.json");
 
     // Check file exists
     await access(credentialsPath);
@@ -53,6 +75,7 @@ describe("setupOAuthCredentials", () => {
 
     await setupOAuthCredentials(credentials);
 
+    const credentialsPath = join(homedir(), ".claude", ".credentials.json");
     const content = await readFile(credentialsPath, "utf-8");
     const parsed = JSON.parse(content);
 
@@ -75,6 +98,7 @@ describe("setupOAuthCredentials", () => {
       expiresAt: "2222222222",
     });
 
+    const credentialsPath = join(homedir(), ".claude", ".credentials.json");
     const content = await readFile(credentialsPath, "utf-8");
     const parsed = JSON.parse(content);
 
@@ -95,6 +119,34 @@ describe("setupOAuthCredentials", () => {
     await setupOAuthCredentials(credentials);
 
     // Verify file was created
+    const credentialsPath = join(homedir(), ".claude", ".credentials.json");
     await access(credentialsPath);
+  });
+
+  test("should use XDG_CONFIG_HOME when set", async () => {
+    // Set XDG_CONFIG_HOME to a test directory
+    const testXdgPath = join(homedir(), ".test-xdg-config");
+    process.env.XDG_CONFIG_HOME = testXdgPath;
+
+    const credentials = {
+      accessToken: "xdg-test-token",
+      refreshToken: "xdg-test-refresh",
+      expiresAt: "1234567890",
+    };
+
+    await setupOAuthCredentials(credentials);
+
+    // Check that credentials were written to XDG path
+    const xdgCredentialsPath = join(testXdgPath, "claude", ".credentials.json");
+    await access(xdgCredentialsPath);
+
+    const content = await readFile(xdgCredentialsPath, "utf-8");
+    const parsed = JSON.parse(content);
+
+    expect(parsed.claudeAiOauth.accessToken).toBe("xdg-test-token");
+    expect(parsed.claudeAiOauth.refreshToken).toBe("xdg-test-refresh");
+
+    // Clean up
+    await unlink(xdgCredentialsPath);
   });
 });

@@ -8,7 +8,7 @@ import { join } from "path";
  * 1. XDG_CONFIG_HOME/claude (XDG Base Directory spec)
  * 2. ~/.claude (legacy fallback)
  */
-function getClaudeConfigHomeDir(): string {
+export function getClaudeConfigHomeDir(): string {
   if (process.env.XDG_CONFIG_HOME) {
     return join(process.env.XDG_CONFIG_HOME, "claude");
   }
